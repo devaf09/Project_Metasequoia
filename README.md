@@ -48,6 +48,6 @@ python experiments/a1_sinwave.py --data fashion --seeds 0 --N 32 --scale 1 --pat
 
 - データ（MNIST / Fashion-MNIST）は `data/` に置く（リポジトリには含めない）。
 - 必要なもの: Python 3、PyTorch、torchvision。テストは `python -m pytest tests`。
-- `sinwave_minimal.py` は前のプロジェクトの 1 次元版 v1.0.0 をそのまま取り込んだもの。
+- `sinwave_minimal.py` は前のプロジェクトの 1 次元版（v1.3.0）をそのまま取り込んだもの。`sinwave2d_minimal.py` は 2 次元版（v0.1.0）。
 
 ライセンス: MIT

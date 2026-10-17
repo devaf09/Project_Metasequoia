@@ -1,12 +1,17 @@
-"""実験 A7: 2 技能に分けた並列光路の融合（0〜4 と 5〜9）。
+"""実験08 / 08b（旧 A7 / A7b）: 2 技能に分けた並列光路の融合（0〜4 と 5〜9）。
 
-    python experiments/a7_fusion.py --data mnist --seeds 0 1 2 --N 32 --scale 1 --steps 10000
+着想: 1 次元では、別々に学習した技能を窓の明るさを足すだけで融合できた（Sin-CNN2 実験21、技能単独との差 −4〜−8）。
+      段階 B（継続学習）の土台として、2 次元でも成り立つかを確かめる。08b は 1 次元で融合を改善した
+      tilt 照明と滲み層を試す。
+比べるもの: 10 クラスを一度に学習した SinWave2D（実験07）。
+
+    python experiments/exp08_fusion.py --data mnist --seeds 0 1 2 --N 32 --scale 1 --steps 10000
 
 技能 A は 0〜4 の画像だけ、技能 B は 5〜9 の画像だけで別々に学習する（seed も別）。
 どちらも窓は 10 個すべてで損失を取るので、担当外の窓は暗くなるように学ぶ（1 次元版 sinwave_minimal.py と同じ）。
 融合は 2 つの光路のスコア（窓の明るさ）の平均を取るだけで、追加の学習も相手のデータも使わない。
 取消は融合から外すだけで、残った技能は元と完全に同じ。
-結果は results/a7.jsonl に追記する。
+結果は results/exp<tag>.txt に 1 行 1 結果（引数をすべて含む JSON）で追記する。
 """
 import argparse
 import json
@@ -21,10 +26,10 @@ from sinwave2d import SinWave2D, data, train as T  # noqa: E402
 ap = argparse.ArgumentParser()
 ap.add_argument("--data", default="mnist")
 ap.add_argument("--seeds", type=int, nargs="+", default=[0])
-ap.add_argument("--tag", default="A7")
+ap.add_argument("--tag", default="08")
 ap.add_argument("--steps", type=int, default=10000)
 ap.add_argument("--lr", type=float, default=0.01)
-ap.add_argument("--out", default="results/a7.jsonl")
+ap.add_argument("--out", default=None, help="省略時は results/exp<tag>.txt")
 ap.add_argument("--N", type=int, default=32)
 ap.add_argument("--scale", type=int, default=1)
 ap.add_argument("--layers", type=int, default=16)
@@ -34,6 +39,8 @@ ap.add_argument("--illum", default="none")
 ap.add_argument("--blocks", type=int, default=2)
 ap.add_argument("--chunk", type=int, default=0)
 a = ap.parse_args()
+a.out = a.out or f"results/exp{a.tag}.txt"
+ARGS = dict(vars(a), script="exp08_fusion.py")
 
 dev = "cuda"
 D = data.load(a.data, device=dev)
@@ -74,7 +81,7 @@ for s in a.seeds:
                fused_B=acc_own(SF, yte, own["B"]),
                fused_on_A=(SF.argmax(1)[yte < 5] == yte[yte < 5]).float().mean().item(),   # 0〜4 の画像、10 クラスで
                fused_on_B=(SF.argmax(1)[yte >= 5] == yte[yte >= 5]).float().mean().item(),
-               train_s=t_train)
+               train_s=t_train, lr=a.lr, args=ARGS)
     print(json.dumps(row, ensure_ascii=False), flush=True)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "a", encoding="utf-8") as f:

@@ -1,6 +1,11 @@
-"""実験 B1: 2 技能の融合で「どちらの技能の画像か」の取り違えを直す工夫（計画は docs/plan_stage_B.md）。
+"""実験09（旧 B1）: 2 技能の融合で「どちらの技能の画像か」の取り違えを直す工夫（計画は docs/plan_stage_B.md）。
 
-    python experiments/b1_fusion.py --data fashion --seeds 0 1 2 --steps 3000 --start shared --neg shuffle
+着想: 実験08 で、各技能が見たことのない相手の画像にも自分の窓を明るくするため、融合が大きく崩れた。
+      相手のデータを使わずに、見たことのない画像への過信を抑える方法と、技能どうしのスコアの物差しを
+      そろえる方法、1 次元で効いた「共通の出発点」（Sin-CNN2 実験23）を試す。
+比べるもの: 工夫なしの融合（実験08b と同じ）、10 クラスを一度に学習（実験03 の N=32）。
+
+    python experiments/exp09_fusion_fix.py --data fashion --seeds 0 1 2 --steps 3000 --start shared --neg shuffle
 
 設定は実験 A7 と同じ（技能 A は 0〜4、技能 B は 5〜9 の画像だけで学習。相手のデータは使わない）。
   --start indep  : A と B を別々の乱数の板から学習（A7 と同じ）
@@ -9,7 +14,7 @@
                    10 個の窓のどれも選ばない（一様な確率）ように学ぶ。見たことのない画像への過信を抑えるため
   融合は 3 通りを同時に測る: 平均（A7 と同じ）、較正つき平均（技能ごとに、自分の訓練データでのスコアの平均と
                    標準偏差で標準化してから平均）、差分の足し算（--start shared のときだけ）
-結果は results/b1.jsonl に追記する。
+結果は results/exp<tag>.txt に 1 行 1 結果（引数をすべて含む JSON）で追記する。
 """
 import argparse
 import copy
@@ -26,14 +31,14 @@ from sinwave2d import SinWave2D, data  # noqa: E402
 ap = argparse.ArgumentParser()
 ap.add_argument("--data", default="mnist")
 ap.add_argument("--seeds", type=int, nargs="+", default=[0])
-ap.add_argument("--tag", default="B1")
+ap.add_argument("--tag", default="09")
 ap.add_argument("--steps", type=int, default=3000)
 ap.add_argument("--lr", type=float, default=0.01)
 ap.add_argument("--batch", type=int, default=256)
 ap.add_argument("--start", default="indep", choices=["indep", "shared"])
 ap.add_argument("--neg", default="none", choices=["none", "shuffle", "noise", "mix"])
 ap.add_argument("--neg_frac", type=float, default=0.25, help="バッチに混ぜる壊した画像の割合")
-ap.add_argument("--out", default="results/b1.jsonl")
+ap.add_argument("--out", default=None, help="省略時は results/exp<tag>.txt")
 ap.add_argument("--device", default="cuda")
 ap.add_argument("--N", type=int, default=32)
 ap.add_argument("--scale", type=int, default=1)
@@ -41,6 +46,8 @@ ap.add_argument("--layers", type=int, default=16)
 ap.add_argument("--patches", type=int, default=8)
 ap.add_argument("--n_train", type=int, default=0, help="0 なら全部（テスト用に小さくできる）")
 a = ap.parse_args()
+a.out = a.out or f"results/exp{a.tag}.txt"
+ARGS = dict(vars(a), script="exp09_fusion_fix.py")
 
 dev = a.device
 D = data.load(a.data, device=dev)
@@ -129,7 +136,7 @@ for s in a.seeds:
         cal[k] = (St.mean().item(), St.std().item() + 1e-6)
     S_avg = (S["A"] + S["B"]) / 2
     S_cal = sum((S[k] - cal[k][0]) / cal[k][1] for k in S) / 2
-    row = dict(exp=a.tag, data=a.data, seed=s, start=a.start, neg=a.neg, neg_frac=a.neg_frac, steps=a.steps, cfg=cfg,
+    row = dict(exp=a.tag, data=a.data, seed=s, start=a.start, neg=a.neg, neg_frac=a.neg_frac, steps=a.steps, cfg=cfg, lr=a.lr, args=ARGS,
                A_alone=acc(S["A"], yte, own["A"]), B_alone=acc(S["B"], yte, own["B"]),
                fused_avg=acc(S_avg, yte), fused_cal=acc(S_cal, yte),
                fused_avg_onA=acc(S_avg[yte < 5], yte[yte < 5]), fused_avg_onB=acc(S_avg[yte >= 5], yte[yte >= 5]))

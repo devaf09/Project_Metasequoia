@@ -1,6 +1,7 @@
-"""results/*.jsonl を構成ごとにまとめて表示する（平均±標準誤差、%）。
+"""results/expNN.txt を構成ごとにまとめて表示する（平均±標準誤差、%）。比較相手と SinWave2D の単体の学習用
+（実験01〜07）。融合の実験（08・09）は列が違うので、NOTES.md の表は各実験の節に書いた集計による。
 
-    python tools/summarize.py results/a0.jsonl results/a1.jsonl
+    python tools/summarize.py results/exp01b.txt results/exp07.txt
 """
 import collections
 import json
@@ -20,6 +21,7 @@ def ms(v):
 
 
 rows = [json.loads(line) for f in sys.argv[1:] for line in open(f, encoding="utf-8")]
+rows = [r for r in rows if "model" in r]                              # 融合の実験の行は除く
 groups = collections.defaultdict(list)
 for r in rows:
     cfg = r.get("cfg", {})
